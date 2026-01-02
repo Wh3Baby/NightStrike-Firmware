@@ -1,0 +1,45 @@
+# PlatformIO
+.pio/
+.vscode/
+.idea/
+
+# Build artifacts
+*.bin
+*.elf
+*.hex
+*.map
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Emulator state
+emulator_state.json
+
+# Credentials and secrets
+*.key
+*.pem
+*.cert
+secrets.h
+config_secrets.h
+

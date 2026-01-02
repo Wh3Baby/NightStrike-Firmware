@@ -1,0 +1,55 @@
+# NightStrike Firmware - Cursor Rules
+
+## Project Context
+This is NightStrike-Firmware - an advanced ESP32 firmware for offensive security operations and Black Hat activities.
+
+## Architecture
+- Modular design with interface-based modules
+- Modern C++17/20, RAII principles
+- Error handling via Error codes (no exceptions)
+- Namespace organization: NightStrike::Core, NightStrike::Modules, NightStrike::Utils
+- Singleton pattern for system components
+
+## Code Style
+- camelCase for methods, PascalCase for classes
+- Use Error type for error handling (not exceptions)
+- All modules implement IModule interface
+- Use LOG_INFO(), LOG_ERROR() macros for logging
+- Follow existing patterns in codebase
+
+## Key Components
+- Core: System, Config, Errors, Display, Input, Menu, Storage, Network, WebUI, Logger, PowerManagement
+- Modules: WiFi (100%), BLE (75%), RF (65%), RFID (65%), BlackHat Tools (55%)
+- Utils: String utilities, logging system
+
+## Important Files
+- src/main.cpp - Entry point
+- src/core/ - Core system components
+- src/modules/ - Feature modules
+- include/ - Header files
+- platformio.ini - Project configuration
+
+## When Adding New Code
+1. Follow existing architecture patterns
+2. Implement IModule interface for new modules
+3. Use Error type for error handling
+4. Add unit tests
+5. Update documentation
+6. Use appropriate namespace
+
+## Security
+- No hardcoded passwords
+- Mandatory password change on first boot
+- Password validation required
+- Secure configuration storage
+
+## Testing
+- Use Unity framework
+- Add unit tests for new components
+- Integration tests for modules
+
+## Documentation
+- Update docs/ when adding features
+- Add examples to docs/EXAMPLES.md
+- Document API in headers
+

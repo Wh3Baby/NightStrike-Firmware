@@ -1,0 +1,5 @@
+# Отключаем автоматическую установку зависимостей PlatformIO
+export PLATFORMIO_LIB_EXTRA_DIRS=".pio/lib"
+export PLATFORMIO_CHECK_LIBDEPS="false"
+export PLATFORMIO_CHECK_PLATFORMIO_INI="false"
+
