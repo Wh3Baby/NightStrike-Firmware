@@ -1,8 +1,15 @@
-# NightStrike Firmware
+# 🌑 NightStrike Firmware
 
 **Advanced ESP32 Firmware for Offensive Security Operations**
 
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-ESP32-orange.svg)](https://www.espressif.com/)
+[![C++](https://img.shields.io/badge/C++-17/20-blue.svg)](https://isocpp.org/)
+[![Status](https://img.shields.io/badge/status-Production%20Ready-success.svg)]()
+
 NightStrike — профессиональная прошивка для ESP32, предназначенная для тестирования безопасности, red team операций и исследований. Построена на современном C++17/20 с модульной архитектурой и комплексной обработкой ошибок без использования исключений.
+
+**⭐ Если проект оказался полезным, поставьте звезду! Это мотивирует продолжать разработку.**
 
 ---
 
