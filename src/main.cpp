@@ -13,6 +13,7 @@
 #include "core/storage.h"
 #include "core/network.h"
 #include "core/hardware_detection.h"
+#include "core/power_management.h"
 #include "core/errors.h"
 #include "modules/wifi_module.h"
 #include "modules/ble_module.h"
@@ -98,6 +99,13 @@ void setup() {
                                                 display.getSize().height / 2),
                                  "NightStrike");
         delay(2000);
+    }
+
+    // Initialize power management
+    auto& power = PowerManagement::getInstance();
+    err = power.initialize();
+    if (err.isError()) {
+        Serial.printf("[WARN] Power management init failed: %s\n", getErrorMessage(err.code));
     }
 
     // Initialize input

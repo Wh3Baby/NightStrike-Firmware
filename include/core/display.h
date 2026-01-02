@@ -56,6 +56,9 @@ public:
     Error drawText(Point pos, const char* text);
     Error drawTextCentered(Point center, const char* text);
 
+    // Battery indicator
+    Error drawBatteryIndicator(Point pos, int level, bool charging);
+
     // Display info
     Size getSize() const { return _size; }
     bool isInitialized() const { return _initialized; }

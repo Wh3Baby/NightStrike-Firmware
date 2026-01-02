@@ -237,6 +237,76 @@ Error Display::drawTextCentered(Point center, const char* text) {
     return Error(ErrorCode::SUCCESS);
 }
 
+Error Display::drawBatteryIndicator(Point pos, int level, bool charging) {
+    if (!_initialized) {
+        return Error(ErrorCode::NOT_INITIALIZED);
+    }
+
+    if (level < 0 || level > 100) {
+        return Error(ErrorCode::INVALID_PARAMETER);
+    }
+
+#ifdef HAS_SCREEN
+    // Battery icon: rectangle with rounded end + charging indicator
+    const uint16_t width = 24;
+    const uint16_t height = 12;
+    const uint16_t tipWidth = 2;
+    const uint16_t tipHeight = 6;
+    
+    // Battery outline color (white)
+    Color outlineColor = Color::White();
+    // Battery fill color based on level
+    Color fillColor = Color::Green();  // Default to green
+    if (level > 50) {
+        fillColor = Color::Green();
+    } else if (level > 20) {
+        fillColor = Color(0xFFE0);  // Yellow
+    } else {
+        fillColor = Color::Red();
+    }
+    
+    // Draw battery body (rectangle)
+    tft.drawRect(pos.x, pos.y, width, height, outlineColor.value);
+    
+    // Draw battery tip (small rectangle on the right)
+    tft.fillRect(pos.x + width, pos.y + (height - tipHeight) / 2, tipWidth, tipHeight, outlineColor.value);
+    
+    // Draw battery fill (level indicator)
+    uint16_t fillWidth = ((width - 2) * level) / 100;
+    if (fillWidth > 0) {
+        tft.fillRect(pos.x + 1, pos.y + 1, fillWidth, height - 2, fillColor.value);
+    }
+    
+    // Draw charging indicator (lightning bolt) if charging
+    if (charging) {
+        // Simple lightning bolt: small triangle
+        tft.fillTriangle(
+            pos.x + width / 2, pos.y + 2,
+            pos.x + width / 2 - 2, pos.y + height / 2,
+            pos.x + width / 2 + 2, pos.y + height / 2,
+            Color::White().value
+        );
+        tft.fillTriangle(
+            pos.x + width / 2, pos.y + height - 2,
+            pos.x + width / 2 - 2, pos.y + height / 2,
+            pos.x + width / 2 + 2, pos.y + height / 2,
+            Color::White().value
+        );
+    }
+    
+    // Draw percentage text next to battery icon
+    char percentStr[5];
+    snprintf(percentStr, sizeof(percentStr), "%d%%", level);
+    tft.setTextColor(Color::White().value, Color::Black().value);
+    tft.setTextSize(1);
+    tft.setCursor(pos.x + width + tipWidth + 2, pos.y + 2);
+    tft.print(percentStr);
+#else
+    Serial.printf("[Display] Battery: %d%% %s\n", level, charging ? "(charging)" : "");
+#endif
+    return Error(ErrorCode::SUCCESS);
+}
+
 } // namespace Core
 } // namespace NightStrike
 

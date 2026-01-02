@@ -1,6 +1,7 @@
 #include "core/menu.h"
 #include "core/display.h"
 #include "core/input.h"
+#include "core/power_management.h"
 #include <algorithm>
 
 namespace NightStrike {
@@ -145,6 +146,19 @@ void Menu::render() {
 
     auto& display = Display::getInstance();
     display.clear();
+
+    // Draw battery indicator in top-right corner
+    auto& power = PowerManagement::getInstance();
+    if (power.isInitialized()) {
+        int batteryLevel = power.getBatteryLevel();
+        bool isCharging = power.isCharging();
+        if (batteryLevel >= 0) {
+            // Position: top-right corner (240x135 display)
+            // Battery icon is 24px wide + 2px tip + ~20px text = ~46px total
+            // Position at x = 240 - 46 = 194, y = 2
+            display.drawBatteryIndicator(Display::Point(194, 2), batteryLevel, isCharging);
+        }
+    }
 
     if (_renderCallback) {
         // Use custom renderer
