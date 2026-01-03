@@ -18,7 +18,6 @@ NightStrike — профессиональная прошивка для ESP32, 
 - [Обзор](#обзор)
 - [Архитектура](#архитектура)
 - [Модули](#модули)
-- [Сравнение с Bruce](#сравнение-с-bruce)
 - [Установка и сборка](#установка-и-сборка)
 - [Использование](#использование)
 - [Разработка](#разработка)
@@ -113,8 +112,8 @@ WiFi Menu
 **Возможности:**
 - Сканирование устройств с отображением списка
 - Spam атаки (iOS, Android, Windows, Samsung)
-- HID keyboard injection (framework)
-- Bad BLE (выполнение Ducky скриптов через BLE)
+- HID keyboard injection (полная реализация через NimBLE)
+- Bad BLE (выполнение Ducky скриптов через BLE HID)
 
 **Интерактивное меню:**
 ```
@@ -168,8 +167,9 @@ BLE Menu
 
 **Возможности:**
 - IR передача/прием (RMT)
+- IR Decoding (NEC, RC5, RC6, SIRC 12/15/20 bit)
 - TV-B-Gone (универсальное выключение TV, US/EU коды)
-- IR Jammer
+- IR Jammer (полная реализация через RMT)
 - Кастомные IR команды
 
 ### BadUSB Module
@@ -178,7 +178,8 @@ BLE Menu
 
 **Возможности:**
 - Ducky script execution (полный парсер)
-- Keyboard injection (BLE HID framework)
+- Keyboard injection (полная реализация через BLE HID)
+- Raw HID key injection (поддержка модификаторов)
 - Script management (загрузка/сохранение)
 - Поддержка всех основных команд: STRING, DELAY, GUI, ALT, CTRL, SHIFT, ENTER, TAB, ESC, стрелки, F-клавиши, DEFAULT_DELAY
 
@@ -269,9 +270,10 @@ JavaScript интерпретатор для выполнения скрипто
 - Port scanning (TCP/UDP)
 - Service detection (banner grabbing)
 - Credential harvesting (framework)
-- ARP spoofing (framework)
-- DNS spoofing (framework)
-- Packet injection/capture (framework)
+- ARP spoofing (framework, FreeRTOS task)
+- DNS spoofing (framework, FreeRTOS task)
+- Packet injection (framework)
+- Packet capture (полная реализация через WiFi sniffer)
 - Exploit framework
 
 ### Physical Hack Module
@@ -279,205 +281,13 @@ JavaScript интерпретатор для выполнения скрипто
 Модуль для физического доступа и автоматизации атак.
 
 **Возможности:**
-- OS detection (Windows, Linux, macOS, Android, iOS)
+- OS detection (Windows, Linux, macOS, Android, iOS, улучшенная реализация)
 - Exploit Library → список эксплойтов → Info / Execute
 - Auto Exploit (автоматический выбор и выполнение)
 - USB Type-C (HID, Mass Storage, Serial)
-- Bluetooth (BLE HID)
+- Bluetooth (BLE HID, полная реализация)
 - Built-in exploit library с Ducky scripts
 - Persistence mechanisms (framework)
-
----
-
-## Сравнение с Bruce
-
-### Общее сравнение
-
-| Характеристика | NightStrike | Bruce |
-|----------------|-------------|-------|
-| **Архитектура** | Модульная, интерфейсная система | Модульная, но менее структурированная |
-| **Язык программирования** | C++17/20, строгие стандарты | C++, смешанные стандарты |
-| **Обработка ошибок** | Система кодов ошибок (50+), без исключений | Частичная обработка ошибок |
-| **Поддержка плат** | 10+ плат с автоопределением | 20+ плат, ручная конфигурация |
-| **Размер прошивки** | 1.53MB (77.9% от 1.9MB) | ~1.5-2MB (зависит от конфигурации) |
-| **Оптимизация памяти** | Агрессивная (-Os, gc-sections) | Стандартная |
-| **Меню** | Горизонтальная ориентация, интерактивные списки | Вертикальная ориентация |
-| **Web UI** | Полнофункциональный с файловым менеджером | Базовый функционал |
-
-### Сравнение модулей
-
-#### WiFi Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Сканирование сетей | ✅ С интерактивным списком | ✅ Базовое |
-| Deauthentication | ✅ Одиночные и массовые | ✅ Одиночные и массовые |
-| Evil Portal | ✅ Полная реализация | ✅ Полная реализация |
-| Beacon Spam | ✅ | ✅ |
-| Karma Attack | ✅ | ✅ |
-| TelNet Client | ✅ Полная реализация | ✅ |
-| SSH Client | ✅ Framework | ✅ |
-| Wireguard | ✅ Framework | ✅ |
-| ARP Spoofing | ✅ | ✅ |
-| Responder | ✅ Framework | ✅ |
-| TCP Client/Listener | ✅ | ✅ |
-| Host Scanning | ✅ С port scanning | ✅ С port scanning |
-| Packet Sniffing | ✅ | ✅ |
-| Brucegotchi/Pwnagotchi | ❌ | ✅ |
-
-**Вывод:** NightStrike имеет более структурированное меню и интерактивные списки, но не имеет интеграции с Pwnagotchi.
-
-#### BLE Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Сканирование устройств | ✅ С интерактивным списком | ✅ Базовое |
-| Spam атаки | ✅ iOS, Android, Windows, Samsung | ✅ iOS, Android, Windows, Samsung |
-| HID Keyboard | ✅ Framework | ✅ Только для Cardputer/T-Deck |
-| Bad BLE | ✅ Через BadUSB модуль | ✅ Отдельный модуль |
-
-**Вывод:** Функциональность сопоставима, но NightStrike имеет более унифицированный подход.
-
-#### RF Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Драйверы | CC1101, NRF24L01 (2 драйвера) | CC1101, RF433 T/R M5Stack (2 драйвера) |
-| Протоколы | 7 протоколов | 7 протоколов |
-| Spectrum Analyzer | ✅ Полная реализация | ✅ |
-| Jammer | ✅ Full/Intermittent | ✅ Full/Intermittent |
-| Автоопределение | ✅ | ❌ Ручная настройка |
-| Сохранение кодов | ✅ JSON формат | ✅ Собственный формат |
-
-**Вывод:** NightStrike имеет автоопределение модулей, но Bruce поддерживает больше вариантов RF модулей.
-
-#### RFID Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Чтение/запись | ✅ | ✅ |
-| Эмуляция | ✅ | ❌ |
-| Amiibo | ✅ Framework | ✅ |
-| Chameleon | ✅ До 8 слотов | ✅ |
-| EMV Reading | ✅ Framework | ✅ |
-| Поддержка модулей | PN532 (framework) | PN532, PN532Killer |
-
-**Вывод:** NightStrike имеет эмуляцию тегов, но Bruce поддерживает больше типов RFID модулей.
-
-#### IR Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Протоколы | 9 протоколов | 8 протоколов |
-| TV-B-Gone | ✅ US/EU коды | ✅ US/EU коды |
-| IR Jammer | ✅ | ✅ |
-| Кастомные команды | ✅ | ✅ |
-
-**Вывод:** NightStrike поддерживает больше IR протоколов (9 vs 8).
-
-#### BadUSB Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Ducky Scripts | ✅ Полный парсер | ✅ Полный парсер |
-| Поддержка команд | ✅ Все основные | ✅ Все основные |
-| Хранение скриптов | ✅ LittleFS + SD | ✅ LittleFS + SD |
-| USB Keyboard | ❌ | ✅ Только Cardputer/T-Deck |
-
-**Вывод:** Функциональность сопоставима, но Bruce имеет USB Keyboard для некоторых плат.
-
-#### FM Radio Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Broadcast | ✅ Standard/Reserved/Stop | ✅ Standard/Reserved/Stop |
-| Spectrum Analyzer | ✅ FreeRTOS task | ❌ |
-| Frequency Scanning | ✅ 76.0-108.0 MHz | ❌ |
-| Si4713 Support | ✅ Автоопределение | ✅ |
-| Traffic Announcement | ✅ Framework | ❌ |
-
-**Вывод:** NightStrike имеет более полную реализацию FM модуля.
-
-#### ESPNOW Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| Send/Receive Files | ✅ С chunking | ✅ |
-| Send/Receive Commands | ✅ | ✅ |
-| Peer Discovery | ✅ Framework | ❌ |
-
-**Вывод:** NightStrike имеет более структурированную реализацию.
-
-#### Physical Hack Module
-
-| Функция | NightStrike | Bruce |
-|---------|-------------|-------|
-| OS Detection | ✅ Windows, Linux, macOS, Android, iOS | ❌ |
-| Exploit Library | ✅ Built-in с Ducky scripts | ❌ |
-| Auto Exploit | ✅ | ❌ |
-| USB HID/Mass Storage | ✅ Framework | ❌ |
-| BLE HID | ✅ | ❌ |
-
-**Вывод:** NightStrike имеет уникальный модуль Physical Hack, которого нет в Bruce.
-
-### Архитектурные различия
-
-#### NightStrike
-
-- **Интерфейсная система модулей** — все модули реализуют `IModule`
-- **Единая система ошибок** — `Error` структура с кодами ошибок
-- **Автоопределение оборудования** — автоматическое определение при запуске
-- **Горизонтальное меню** — оптимизировано для 240x135 дисплеев
-- **Интерактивные списки** — динамические списки с действиями
-- **Строгая типизация** — C++17/20, RAII, умные указатели
-
-#### Bruce
-
-- **Модульная структура** — модули без единого интерфейса
-- **Разнородная обработка ошибок** — смешанные подходы
-- **Ручная конфигурация** — требуется настройка для каждой платы
-- **Вертикальное меню** — традиционная ориентация
-- **Статические списки** — фиксированные меню
-- **Гибкая конфигурация** — больше опций настройки
-
-### Преимущества NightStrike
-
-1. **Архитектура** — более структурированная, интерфейсная система
-2. **Обработка ошибок** — единая система кодов ошибок
-3. **IR протоколы** — больше поддерживаемых протоколов (9 vs 8)
-4. **FM Radio** — более полная реализация (spectrum analyzer, frequency scanning)
-5. **Physical Hack** — уникальный модуль для физического доступа
-6. **Меню** — интерактивные списки с динамическими действиями
-7. **Оптимизация** — агрессивная оптимизация памяти
-8. **Автоопределение** — автоматическое определение оборудования
-
-### Преимущества Bruce
-
-1. **Поддержка плат** — больше поддерживаемых плат (20+ vs 10+)
-2. **RF драйверы** — больше вариантов RF модулей
-3. **RFID модули** — поддержка PN532Killer
-4. **USB Keyboard** — нативная поддержка для некоторых плат
-5. **Pwnagotchi** — интеграция с Pwnagotchi
-6. **Сообщество** — более активное сообщество и документация
-7. **Гибкость** — больше опций конфигурации
-
-### Итоговое сравнение
-
-| Критерий | NightStrike | Bruce | Победитель |
-|----------|-------------|-------|------------|
-| Архитектура | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | NightStrike |
-| Обработка ошибок | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | NightStrike |
-| Поддержка плат | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Bruce |
-| IR протоколы | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | NightStrike |
-| FM Radio | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | NightStrike |
-| Physical Hack | ⭐⭐⭐⭐⭐ | ⭐ | NightStrike |
-| Меню и UX | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | NightStrike |
-| RF драйверы | ⭐⭐⭐ | ⭐⭐⭐⭐ | Bruce |
-| RFID модули | ⭐⭐⭐ | ⭐⭐⭐⭐ | Bruce |
-| Оптимизация | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | NightStrike |
-| Документация | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Bruce |
-
-**Общий вывод:** NightStrike превосходит Bruce в архитектуре, обработке ошибок, IR протоколах, FM Radio и имеет уникальный Physical Hack модуль. Bruce превосходит в поддержке плат, количестве RF/RFID модулей и документации.
 
 ---
 
@@ -532,7 +342,7 @@ JavaScript интерпретатор для выполнения скрипто
 - App partition: 1.9MB (вместо стандартных 1.3MB)
 - LittleFS удален для экономии места (можно добавить обратно при необходимости)
 
-**Результат:** Прошивка укладывается в **1.53MB** (77.9% от доступных 1.9MB), оставляя запас для будущих функций.
+**Результат:** Прошивка укладывается в **1.54MB** (78.5% от доступных 1.9MB), оставляя запас для будущих функций.
 
 ### Сборка прошивки
 
@@ -750,17 +560,23 @@ NightStrike-Firmware/
 - **25+ модульных файлов исходного кода** (.cpp)
 - **18+ заголовочных файлов модулей** (.h)
 - **14 модульных директорий**
-- **~15000+ строк кода** (модули + core + utils)
+- **~16000+ строк кода** (модули + core + utils)
 - **14 основных модулей** — все на 100%
 - **12 core компонентов**
 - **Поддержка 10+ плат** с автоопределением
 - **7 RF протоколов** (Came, Linear, Holtek, NiceFlo, Chamberlain, Liftmaster, Ansonic)
 - **2 RF драйвера** (CC1101, NRF24L01) — оптимизировано для экономии памяти
 - **9 IR протоколов** (NEC, NECext, RC5, RC5X, RC6, SIRC, SIRC15, SIRC20, Samsung32, Sony)
+- **BLE HID Keyboard** (полная реализация через NimBLE)
+- **BadUSB HID Injection** (полная интеграция с BLE HID)
+- **RF Jammer** (полная реализация через FreeRTOS)
+- **IR Jammer и Decoding** (полная реализация через RMT)
+- **Physical Hack OS Detection** (улучшенная реализация)
+- **BlackHat Tools** (ARP/DNS spoofing, packet injection/capture)
 - **WebUI с файловым менеджером** (SD Card + LittleFS Manager)
 - **Wireguard Tunneling** (framework)
 - **Полная поддержка Ducky Script** (все основные команды)
-- **Оптимизировано для ограниченной памяти** — укладывается в 1.53MB флеш (77.9% от 1.9MB)
+- **Оптимизировано для ограниченной памяти** — укладывается в 1.54MB флеш (78.5% от 1.9MB)
 
 ### Безопасность
 
