@@ -4,6 +4,8 @@
 #include "core/errors.h"
 #include <vector>
 #include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace NightStrike {
 namespace Modules {
@@ -73,6 +75,13 @@ private:
     uint8_t _txPin = 4;  // Default GPIO4
     uint8_t _rxPin = 5;  // Default GPIO5
     uint32_t _frequency = 38000;  // 38kHz default
+    TaskHandle_t _jammerTaskHandle = nullptr;
+    
+    // Decoding helpers
+    bool decodeNEC(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command);
+    bool decodeRC5(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command);
+    bool decodeRC6(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command);
+    bool decodeSIRC(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command, uint8_t bits = 12);
 };
 
 } // namespace Modules

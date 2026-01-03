@@ -2,6 +2,7 @@
 #include "core/display.h"
 #include "core/input.h"
 #include "core/power_management.h"
+#include <Arduino.h>
 #include <algorithm>
 
 namespace NightStrike {
@@ -18,29 +19,49 @@ Error Menu::initialize() {
     }
 
     // Register input callbacks
+    // For M5StickC PLUS2: Button A (SELECT) = navigate/select, Button B (BACK) = back
+    // Navigation: Short press A = next item, Double press A = select, Button B = back
     auto& input = Input::getInstance();
+    static unsigned long lastSelectPress = 0;
+    
     input.registerButtonCallback([this](Input::Button btn, Input::EventType type) {
-        if (type == Input::EventType::PRESS && _visible) {
-            switch (btn) {
-                case Input::Button::UP:
-                    selectPrevious();
-                    break;
-                case Input::Button::DOWN:
-                    selectNext();
-                    break;
-                case Input::Button::SELECT:
+        if (!_visible) return;
+        
+        switch (btn) {
+            case Input::Button::UP:
+                selectPrevious();
+                break;
+            case Input::Button::DOWN:
+                selectNext();
+                break;
+            case Input::Button::SELECT:
+                if (type == Input::EventType::PRESS) {
+                    unsigned long now = millis();
+                    // Double-click detection (within 400ms) = select
+                    if (lastSelectPress > 0 && (now - lastSelectPress) < 400) {
+                        // Double-click = select item
+                        if (_selectedIndex < _items.size() && _items[_selectedIndex].enabled) {
+                            _items[_selectedIndex].action();
+                        }
+                        lastSelectPress = 0; // Reset
+                    } else {
+                        // Single click = next item
+                        selectNext();
+                        lastSelectPress = now;
+                    }
+                } else if (type == Input::EventType::LONG_PRESS) {
+                    // Long press = select item
                     if (_selectedIndex < _items.size() && _items[_selectedIndex].enabled) {
                         _items[_selectedIndex].action();
                     }
-                    break;
-                case Input::Button::BACK:
-                    // BACK button - call setupMainMenu to return to main menu
-                    // This is handled by menu handlers, but we need a way to trigger it
-                    // For now, we'll let the handlers manage this via "Back" menu items
-                    break;
-                default:
-                    break;
-            }
+                }
+                break;
+            case Input::Button::BACK:
+                // BACK button handling is done via "Back" menu items in each menu
+                // This allows menu handlers to manage navigation properly
+                break;
+            default:
+                break;
         }
     });
 

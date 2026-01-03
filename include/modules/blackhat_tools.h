@@ -6,6 +6,8 @@
 #include <string>
 #include <map>
 #include <functional>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace NightStrike {
 namespace Modules {
@@ -60,11 +62,20 @@ public:
     Core::Error listExploits(std::vector<std::string>& exploits);
 
 private:
+    bool _initialized = false;
     bool _harvesting = false;
     bool _arpSpoofing = false;
     bool _dnsSpoofing = false;
     bool _capturing = false;
+    std::string _arpTarget;
+    std::string _arpGateway;
+    std::map<std::string, std::string> _dnsMap;
     std::vector<std::pair<std::string, std::string>> _harvestedCreds;
+    TaskHandle_t _arpTaskHandle = nullptr;
+    TaskHandle_t _dnsTaskHandle = nullptr;
+    std::function<void(const uint8_t*, size_t)> _captureCallback;
+    uint32_t _captureCount = 0;
+    uint32_t _capturedCount = 0;
 };
 
 } // namespace Modules

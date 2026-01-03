@@ -55,6 +55,7 @@ public:
 private:
     bool _initialized = false;
     bool _running = false;
+    bool _bleKeyboardActive = false;
     uint32_t _defaultDelay = 0;
     std::function<void(uint32_t, uint32_t)> _progressCallback;
 

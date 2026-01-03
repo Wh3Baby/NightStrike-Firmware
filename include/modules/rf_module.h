@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace NightStrike {
 namespace Modules {
@@ -97,10 +99,17 @@ private:
     uint8_t _rfPin1 = 0;
     uint8_t _rfPin2 = 0;
     std::function<void(uint32_t, int8_t)> _spectrumCallback;
+    TaskHandle_t _jammerTaskHandle = nullptr;
     
     // RF driver pointer (defined in .cpp to avoid include)
     void* _rfDriver = nullptr;
+    
+    // Friend function for jammer task
+    friend void rfJammerTask(void* param);
 }; // class RFModule
+
+// Forward declaration
+void rfJammerTask(void* param);
 
 } // namespace Modules
 } // namespace NightStrike

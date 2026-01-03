@@ -12,6 +12,15 @@
 #include "modules/rfid_module.h"
 #include "modules/blackhat_tools.h"
 #include "modules/physical_hack_module.h"
+#include "modules/ir_module.h"
+#include "modules/badusb_module.h"
+#include "modules/gps_module.h"
+#include "modules/fm_module.h"
+#include "modules/espnow_module.h"
+#include "modules/nrf24_module.h"
+#include "modules/ethernet_module.h"
+#include "modules/interpreter_module.h"
+#include "modules/others_module.h"
 #include "core/config.h"
 #include <Arduino.h>
 
@@ -25,6 +34,15 @@ extern RFModule* g_rfModule;
 extern RFIDModule* g_rfidModule;
 extern BlackHatToolsModule* g_blackhatTools;
 extern PhysicalHackModule* g_physicalHackModule;
+extern IRModule* g_irModule;
+extern BadUSBModule* g_badusbModule;
+extern GPSModule* g_gpsModule;
+extern FMModule* g_fmModule;
+extern ESPNOWModule* g_espnowModule;
+extern NRF24Module* g_nrf24Module;
+extern EthernetModule* g_ethernetModule;
+extern InterpreterModule* g_interpreterModule;
+extern OthersModule* g_othersModule;
 
 // Forward declarations
 void setupMainMenu();
@@ -40,6 +58,15 @@ void showBlackHatHostList();
 void showBlackHatHostActions(size_t hostIndex);
 void showPhysicalHackExploitList();
 void showPhysicalHackExploitActions(size_t exploitIndex);
+void showIRMenu();
+void showBadUSBMenu();
+void showGPSMenu();
+void showFMMenu();
+void showESPNOWMenu();
+void showNRF24Menu();
+void showEthernetMenu();
+void showInterpreterMenu();
+void showOthersMenu();
 
 // Helper to show message on display
 void showMessage(const char* msg, uint32_t duration = 2000) {
@@ -1006,6 +1033,465 @@ void showConfigMenu() {
     menu.show();
 }
 
+// IR Menu
+void showIRMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_irModule && g_irModule->isInitialized()) {
+            showMessage("IR already initialized");
+            showIRMenu();
+            return;
+        }
+        if (!g_irModule) {
+            g_irModule = new IRModule();
+        }
+        auto err = g_irModule->initialize();
+        if (err.isError()) {
+            showMessage("IR init failed");
+        } else {
+            showMessage("IR initialized");
+        }
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Transmit Code", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Receive Code", []() {
+        if (!g_irModule || !g_irModule->isInitialized()) {
+            showMessage("IR not initialized");
+            showIRMenu();
+            return;
+        }
+        showMessage("Receiving... (5s)");
+        IRModule::IRCode code;
+        auto err = g_irModule->receiveCode(code, 5000);
+        if (err.isError()) {
+            showMessage("Receive failed");
+        } else {
+            showMessage("Code received!");
+        }
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("TV-B-Gone", []() {
+        if (!g_irModule || !g_irModule->isInitialized()) {
+            showMessage("IR not initialized");
+            showIRMenu();
+            return;
+        }
+        showMessage("TV-B-Gone running...");
+        auto err = g_irModule->tvBGone();
+        if (err.isError()) {
+            showMessage("TV-B-Gone failed");
+        }
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("IR Jammer", []() {
+        if (!g_irModule || !g_irModule->isInitialized()) {
+            showMessage("IR not initialized");
+            showIRMenu();
+            return;
+        }
+        auto err = g_irModule->startJammer(38000);
+        if (err.isError()) {
+            showMessage("Jammer failed");
+        } else {
+            showMessage("Jammer started");
+        }
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Stop Jammer", []() {
+        if (!g_irModule || !g_irModule->isInitialized()) {
+            showMessage("IR not initialized");
+            showIRMenu();
+            return;
+        }
+        g_irModule->stopJammer();
+        showMessage("Jammer stopped");
+        delay(2000);
+        showIRMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// BadUSB Menu
+void showBadUSBMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_badusbModule && g_badusbModule->isInitialized()) {
+            showMessage("BadUSB already initialized");
+            showBadUSBMenu();
+            return;
+        }
+        if (!g_badusbModule) {
+            g_badusbModule = new BadUSBModule();
+        }
+        auto err = g_badusbModule->initialize();
+        if (err.isError()) {
+            showMessage("BadUSB init failed");
+        } else {
+            showMessage("BadUSB initialized");
+        }
+        delay(2000);
+        showBadUSBMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Execute Script", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showBadUSBMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("List Scripts", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showBadUSBMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// GPS Menu
+void showGPSMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_gpsModule && g_gpsModule->isInitialized()) {
+            showMessage("GPS already initialized");
+            showGPSMenu();
+            return;
+        }
+        if (!g_gpsModule) {
+            g_gpsModule = new GPSModule();
+        }
+        auto err = g_gpsModule->initialize();
+        if (err.isError()) {
+            showMessage("GPS init failed");
+        } else {
+            showMessage("GPS initialized");
+        }
+        delay(2000);
+        showGPSMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Start Tracking", []() {
+        if (!g_gpsModule || !g_gpsModule->isInitialized()) {
+            showMessage("GPS not initialized");
+            showGPSMenu();
+            return;
+        }
+        showMessage("Tracking started");
+        delay(2000);
+        showGPSMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Wardriving", []() {
+        if (!g_gpsModule || !g_gpsModule->isInitialized()) {
+            showMessage("GPS not initialized");
+            showGPSMenu();
+            return;
+        }
+        showMessage("Wardriving started");
+        delay(2000);
+        showGPSMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// FM Radio Menu
+void showFMMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_fmModule && g_fmModule->isInitialized()) {
+            showMessage("FM already initialized");
+            showFMMenu();
+            return;
+        }
+        if (!g_fmModule) {
+            g_fmModule = new FMModule();
+        }
+        auto err = g_fmModule->initialize();
+        if (err.isError()) {
+            showMessage("FM init failed");
+        } else {
+            showMessage("FM initialized");
+        }
+        delay(2000);
+        showFMMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Broadcast", []() {
+        if (!g_fmModule || !g_fmModule->isInitialized()) {
+            showMessage("FM not initialized");
+            showFMMenu();
+            return;
+        }
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showFMMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Scan Frequencies", []() {
+        if (!g_fmModule || !g_fmModule->isInitialized()) {
+            showMessage("FM not initialized");
+            showFMMenu();
+            return;
+        }
+        showMessage("Scanning...");
+        delay(2000);
+        showFMMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// ESPNOW Menu
+void showESPNOWMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_espnowModule && g_espnowModule->isInitialized()) {
+            showMessage("ESPNOW already initialized");
+            showESPNOWMenu();
+            return;
+        }
+        if (!g_espnowModule) {
+            g_espnowModule = new ESPNOWModule();
+        }
+        auto err = g_espnowModule->initialize();
+        if (err.isError()) {
+            showMessage("ESPNOW init failed");
+        } else {
+            showMessage("ESPNOW initialized");
+        }
+        delay(2000);
+        showESPNOWMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Send File", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showESPNOWMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Receive File", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showESPNOWMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// NRF24 Menu
+void showNRF24Menu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_nrf24Module && g_nrf24Module->isInitialized()) {
+            showMessage("NRF24 already initialized");
+            showNRF24Menu();
+            return;
+        }
+        if (!g_nrf24Module) {
+            g_nrf24Module = new NRF24Module();
+        }
+        auto err = g_nrf24Module->initialize();
+        if (err.isError()) {
+            showMessage("NRF24 init failed");
+        } else {
+            showMessage("NRF24 initialized");
+        }
+        delay(2000);
+        showNRF24Menu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Jammer", []() {
+        if (!g_nrf24Module || !g_nrf24Module->isInitialized()) {
+            showMessage("NRF24 not initialized");
+            showNRF24Menu();
+            return;
+        }
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showNRF24Menu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Spectrum Analyzer", []() {
+        if (!g_nrf24Module || !g_nrf24Module->isInitialized()) {
+            showMessage("NRF24 not initialized");
+            showNRF24Menu();
+            return;
+        }
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showNRF24Menu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// Ethernet Menu
+void showEthernetMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_ethernetModule && g_ethernetModule->isInitialized()) {
+            showMessage("Ethernet already initialized");
+            showEthernetMenu();
+            return;
+        }
+        if (!g_ethernetModule) {
+            g_ethernetModule = new EthernetModule();
+        }
+        auto err = g_ethernetModule->initialize();
+        if (err.isError()) {
+            showMessage("Ethernet init failed");
+        } else {
+            showMessage("Ethernet initialized");
+        }
+        delay(2000);
+        showEthernetMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("ARP Spoof", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showEthernetMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// Interpreter Menu
+void showInterpreterMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_interpreterModule && g_interpreterModule->isInitialized()) {
+            showMessage("Interpreter already initialized");
+            showInterpreterMenu();
+            return;
+        }
+        if (!g_interpreterModule) {
+            g_interpreterModule = new InterpreterModule();
+        }
+        auto err = g_interpreterModule->initialize();
+        if (err.isError()) {
+            showMessage("Interpreter init failed");
+        } else {
+            showMessage("Interpreter initialized");
+        }
+        delay(2000);
+        showInterpreterMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Execute Script", []() {
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showInterpreterMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
+// Others Menu
+void showOthersMenu() {
+    auto& menu = Menu::getInstance();
+    menu.clear();
+
+    menu.addItem(Menu::MenuItem("Initialize", []() {
+        if (g_othersModule && g_othersModule->isInitialized()) {
+            showMessage("Others already initialized");
+            showOthersMenu();
+            return;
+        }
+        if (!g_othersModule) {
+            g_othersModule = new OthersModule();
+        }
+        auto err = g_othersModule->initialize();
+        if (err.isError()) {
+            showMessage("Others init failed");
+        } else {
+            showMessage("Others initialized");
+        }
+        delay(2000);
+        showOthersMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Reverse Shell", []() {
+        if (!g_othersModule || !g_othersModule->isInitialized()) {
+            showMessage("Others not initialized");
+            showOthersMenu();
+            return;
+        }
+        showMessage("Use Serial/WebUI");
+        delay(2000);
+        showOthersMenu();
+    }));
+
+    menu.addItem(Menu::MenuItem("Back", []() {
+        setupMainMenu();
+    }));
+
+    menu.show();
+}
+
 // Setup main menu (called from main.cpp)
 void setupMainMenu() {
     auto& menu = Menu::getInstance();
@@ -1017,31 +1503,15 @@ void setupMainMenu() {
     menu.addItem(Menu::MenuItem("RFID", showRFIDMenu));
     menu.addItem(Menu::MenuItem("Physical Hack", showPhysicalHackMenu));
     menu.addItem(Menu::MenuItem("BlackHat Tools", showBlackHatMenu));
-    menu.addItem(Menu::MenuItem("IR", []() {
-        showMessage("IR Module (use Serial/WebUI)");
-        delay(2000);
-        setupMainMenu();
-    }));
-    menu.addItem(Menu::MenuItem("BadUSB", []() {
-        showMessage("BadUSB Module (use Serial/WebUI)");
-        delay(2000);
-        setupMainMenu();
-    }));
-    menu.addItem(Menu::MenuItem("GPS", []() {
-        showMessage("GPS Module (use Serial/WebUI)");
-        delay(2000);
-        setupMainMenu();
-    }));
-    menu.addItem(Menu::MenuItem("FM Radio", []() {
-        showMessage("FM Radio Module (use Serial/WebUI)");
-        delay(2000);
-        setupMainMenu();
-    }));
-    menu.addItem(Menu::MenuItem("ESPNOW", []() {
-        showMessage("ESPNOW Module (use Serial/WebUI)");
-        delay(2000);
-        setupMainMenu();
-    }));
+    menu.addItem(Menu::MenuItem("IR", showIRMenu));
+    menu.addItem(Menu::MenuItem("BadUSB", showBadUSBMenu));
+    menu.addItem(Menu::MenuItem("NRF24", showNRF24Menu));
+    menu.addItem(Menu::MenuItem("GPS", showGPSMenu));
+    menu.addItem(Menu::MenuItem("FM Radio", showFMMenu));
+    menu.addItem(Menu::MenuItem("ESPNOW", showESPNOWMenu));
+    menu.addItem(Menu::MenuItem("Ethernet", showEthernetMenu));
+    menu.addItem(Menu::MenuItem("Interpreter", showInterpreterMenu));
+    menu.addItem(Menu::MenuItem("Others", showOthersMenu));
     menu.addItem(Menu::MenuItem("Config", showConfigMenu));
     
     // Show menu after setup

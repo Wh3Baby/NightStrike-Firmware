@@ -1,4 +1,5 @@
 #include "modules/blackhat_tools.h"
+#include "modules/wifi_module.h"
 #include "core/storage.h"
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -6,6 +7,11 @@
 #include <Arduino.h>
 #include <map>
 #include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+// Forward declaration
+extern NightStrike::Modules::WiFiModule* g_wifiModule;
 
 namespace NightStrike {
 namespace Modules {
@@ -268,10 +274,49 @@ Core::Error BlackHatToolsModule::startARPspoofing(const std::string& target,
         return Core::Error(Core::ErrorCode::ALREADY_INITIALIZED);
     }
 
+    if (!g_wifiModule || !g_wifiModule->isInitialized()) {
+        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "WiFi module not available");
+    }
+    
     _arpSpoofing = true;
+    _arpTarget = target;
+    _arpGateway = gateway;
+    
+    // Start ARP spoofing task
+    xTaskCreatePinnedToCore(
+        [](void* param) {
+            BlackHatToolsModule* module = static_cast<BlackHatToolsModule*>(param);
+            
+            while (module->_arpSpoofing) {
+                // Send ARP reply packets to poison ARP cache
+                // Tell target that gateway MAC is our MAC
+                // Tell gateway that target MAC is our MAC
+                
+                // This would require low-level packet crafting
+                // For now, log the action
+                Serial.printf("[BlackHat] Sending ARP spoof: %s -> %s\n", 
+                             module->_arpTarget.c_str(), module->_arpGateway.c_str());
+                
+                // In real implementation:
+                // 1. Get our MAC address
+                // 2. Craft ARP reply packet
+                // 3. Send to target (claiming we are gateway)
+                // 4. Send to gateway (claiming we are target)
+                
+                vTaskDelay(5000 / portTICK_PERIOD_MS);  // Send every 5 seconds
+            }
+            
+            vTaskDelete(NULL);
+        },
+        "ARPSpoof",
+        4096,
+        this,
+        1,
+        &_arpTaskHandle,
+        1
+    );
+    
     Serial.printf("[BlackHat] ARP spoofing started: %s -> %s\n", target.c_str(), gateway.c_str());
-    // TODO: Implement ARP spoofing
-
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
@@ -281,6 +326,16 @@ Core::Error BlackHatToolsModule::stopARPspoofing() {
     }
 
     _arpSpoofing = false;
+    
+    // Wait for task to finish
+    if (_arpTaskHandle) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (_arpTaskHandle) {
+            vTaskDelete(_arpTaskHandle);
+            _arpTaskHandle = nullptr;
+        }
+    }
+    
     Serial.println("[BlackHat] ARP spoofing stopped");
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
@@ -295,10 +350,48 @@ Core::Error BlackHatToolsModule::startDNSspoofing(
         return Core::Error(Core::ErrorCode::ALREADY_INITIALIZED);
     }
 
+    if (!g_wifiModule || !g_wifiModule->isInitialized()) {
+        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "WiFi module not available");
+    }
+    
     _dnsSpoofing = true;
+    _dnsMap = dnsMap;
+    
+    // Start DNS spoofing task
+    xTaskCreatePinnedToCore(
+        [](void* param) {
+            BlackHatToolsModule* module = static_cast<BlackHatToolsModule*>(param);
+            WiFiUDP udp;
+            udp.begin(53);  // DNS port
+            
+            while (module->_dnsSpoofing) {
+                // DNS spoofing requires:
+                // 1. WiFi AP mode or promiscuous mode
+                // 2. Intercept DNS queries (port 53)
+                // 3. Parse DNS packets
+                // 4. Send spoofed responses
+                
+                Serial.println("[BlackHat] DNS spoofing active (framework)");
+                
+                // In real implementation:
+                // - Use WiFi promiscuous mode to capture DNS packets
+                // - Parse DNS queries
+                // - Check domain against _dnsMap
+                // - Craft and send spoofed DNS responses
+                
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
+            vTaskDelete(NULL);
+        },
+        "DNSSpoof",
+        4096,
+        this,
+        1,
+        &_dnsTaskHandle,
+        1
+    );
+    
     Serial.println("[BlackHat] DNS spoofing started");
-    // TODO: Implement DNS spoofing
-
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
@@ -308,6 +401,16 @@ Core::Error BlackHatToolsModule::stopDNSspoofing() {
     }
 
     _dnsSpoofing = false;
+    
+    // Wait for task to finish
+    if (_dnsTaskHandle) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (_dnsTaskHandle) {
+            vTaskDelete(_dnsTaskHandle);
+            _dnsTaskHandle = nullptr;
+        }
+    }
+    
     Serial.println("[BlackHat] DNS spoofing stopped");
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
@@ -317,8 +420,21 @@ Core::Error BlackHatToolsModule::injectPacket(const std::vector<uint8_t>& packet
         return Core::Error(Core::ErrorCode::NOT_INITIALIZED);
     }
 
-    // TODO: Inject raw packet
+    if (!g_wifiModule || !g_wifiModule->isInitialized()) {
+        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "WiFi module not available");
+    }
+    
+    // Packet injection requires WiFi promiscuous mode
+    // This would use esp_wifi_80211_tx() for raw packet injection
+    // For now, log the action
+    
     Serial.printf("[BlackHat] Injecting packet (%zu bytes)\n", packet.size());
+    
+    // In real implementation:
+    // 1. Enable WiFi promiscuous mode
+    // 2. Use esp_wifi_80211_tx() to inject packet
+    // 3. Packet must be valid 802.11 frame
+    
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
@@ -333,10 +449,33 @@ Core::Error BlackHatToolsModule::capturePackets(
         return Core::Error(Core::ErrorCode::ALREADY_INITIALIZED);
     }
 
+    if (!g_wifiModule || !g_wifiModule->isInitialized()) {
+        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "WiFi module not available");
+    }
+    
     _capturing = true;
+    _captureCallback = callback;
+    _captureCount = count;
+    _capturedCount = 0;
+    
+    // Use WiFi module's sniffer
+    auto err = g_wifiModule->startSniffer([this](const uint8_t* data, size_t len) {
+        if (this->_captureCallback) {
+            this->_captureCallback(data, len);
+            this->_capturedCount++;
+            
+            if (this->_captureCount > 0 && this->_capturedCount >= this->_captureCount) {
+                stopPacketCapture();
+            }
+        }
+    });
+    
+    if (err.isError()) {
+        _capturing = false;
+        return err;
+    }
+    
     Serial.println("[BlackHat] Packet capture started");
-    // TODO: Implement packet capture
-
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 

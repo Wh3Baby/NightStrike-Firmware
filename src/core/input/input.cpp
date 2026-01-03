@@ -81,7 +81,9 @@ void Input::update() {
     // Read M5StickC PLUS2 hardware buttons
     static unsigned long lastDebounceTime = 0;
     static Button lastButtonState = Button::NONE;
+    static unsigned long buttonPressStart = 0;
     const unsigned long debounceDelay = 50;
+    const unsigned long longPressDelay = 800; // 800ms for long press
     
     Button currentState = Button::NONE;
     
@@ -97,12 +99,16 @@ void Input::update() {
     // Debounce
     if (currentState != lastButtonState) {
         lastDebounceTime = millis();
+        if (currentState != Button::NONE) {
+            buttonPressStart = millis();
+        }
     }
     
     if ((millis() - lastDebounceTime) > debounceDelay) {
         if (currentState != Button::NONE && currentState != _currentButtonState) {
             _lastButton = currentState;
             _currentButtonState = currentState;
+            buttonPressStart = millis();
             if (_buttonCallback) {
                 _buttonCallback(currentState, EventType::PRESS);
             }
@@ -111,6 +117,15 @@ void Input::update() {
                 _buttonCallback(_currentButtonState, EventType::RELEASE);
             }
             _currentButtonState = Button::NONE;
+            buttonPressStart = 0;
+        } else if (currentState != Button::NONE && _currentButtonState == currentState) {
+            // Check for long press
+            if (buttonPressStart > 0 && (millis() - buttonPressStart) > longPressDelay) {
+                if (_buttonCallback) {
+                    _buttonCallback(currentState, EventType::LONG_PRESS);
+                }
+                buttonPressStart = 0; // Prevent multiple long press events
+            }
         }
     }
     

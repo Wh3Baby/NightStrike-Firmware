@@ -129,9 +129,50 @@ Core::Error IRModule::receiveCode(IRCode& code, uint32_t timeout) {
         return Core::Error(Core::ErrorCode::OPERATION_FAILED, "No IR signal received");
     }
 
-    // TODO: Decode received signal based on protocol
-    code.protocol = "RAW";
-    code.rawTimings.clear();
+    // Convert RMT items to timing vector
+    std::vector<uint16_t> timings;
+    for (size_t i = 0; i < num_items && i < 1024; ++i) {
+        if (items[i].duration0 > 0) {
+            timings.push_back(items[i].duration0 * 1000 / 80);  // Convert RMT ticks to microseconds
+        }
+        if (items[i].duration1 > 0) {
+            timings.push_back(items[i].duration1 * 1000 / 80);
+        }
+    }
+    
+    code.rawTimings = timings;
+    
+    // Try to decode using different protocols
+    uint32_t address = 0, command = 0;
+    if (decodeNEC(timings, address, command)) {
+        code.protocol = "NEC";
+        code.address = address;
+        code.command = command;
+    } else if (decodeRC5(timings, address, command)) {
+        code.protocol = "RC5";
+        code.address = address;
+        code.command = command;
+    } else if (decodeRC6(timings, address, command)) {
+        code.protocol = "RC6";
+        code.address = address;
+        code.command = command;
+    } else if (decodeSIRC(timings, address, command, 12)) {
+        code.protocol = "SIRC12";
+        code.address = address;
+        code.command = command;
+    } else if (decodeSIRC(timings, address, command, 15)) {
+        code.protocol = "SIRC15";
+        code.address = address;
+        code.command = command;
+    } else if (decodeSIRC(timings, address, command, 20)) {
+        code.protocol = "SIRC20";
+        code.address = address;
+        code.command = command;
+    } else {
+        code.protocol = "RAW";
+        code.address = 0;
+        code.command = 0;
+    }
 
     delete[] items;
     return Core::Error(Core::ErrorCode::SUCCESS);
@@ -205,18 +246,71 @@ Core::Error IRModule::startJammer(uint32_t frequency) {
     _frequency = frequency;
     _jamming = true;
 
-    // Send continuous carrier signal
-    // This is done by sending a continuous high signal
+    // Reconfigure RMT for continuous jamming
+    rmt_driver_uninstall(RMT_CHANNEL_0);
+    rmt_config_t rmt_tx_config = RMT_DEFAULT_CONFIG_TX((gpio_num_t)_txPin, RMT_CHANNEL_0);
+    rmt_tx_config.tx_config.carrier_en = true;
+    rmt_tx_config.tx_config.carrier_freq_hz = frequency;
+    rmt_tx_config.tx_config.carrier_duty_percent = 50;
+    rmt_config(&rmt_tx_config);
+    rmt_driver_install(RMT_CHANNEL_0, 0, 0);
+
+    // Create continuous jamming signal (alternating high/low)
+    // This creates a continuous carrier wave
+    rmt_item32_t jammer_items[2];
+    jammer_items[0].level0 = 1;
+    jammer_items[0].duration0 = 13;  // ~50% duty cycle at 38kHz (80MHz / 38kHz / 2 ≈ 1053 ticks, use 13 for faster)
+    jammer_items[0].level1 = 0;
+    jammer_items[0].duration1 = 13;
+    jammer_items[1].level0 = 1;
+    jammer_items[1].duration0 = 0;  // End marker
+    jammer_items[1].duration1 = 0;
+
+    // Start continuous transmission in a loop
+    xTaskCreatePinnedToCore(
+        [](void* param) {
+            IRModule* module = static_cast<IRModule*>(param);
+            rmt_item32_t items[2];
+            items[0].level0 = 1;
+            items[0].duration0 = 13;
+            items[0].level1 = 0;
+            items[0].duration1 = 13;
+            items[1].level0 = 1;
+            items[1].duration0 = 0;
+            items[1].duration1 = 0;
+            
+            while (module->_jamming) {
+                rmt_write_items(RMT_CHANNEL_0, items, 2, true);
+                vTaskDelay(1 / portTICK_PERIOD_MS);
+            }
+            vTaskDelete(NULL);
+        },
+        "IRJammer",
+        2048,
+        this,
+        1,
+        &_jammerTaskHandle,
+        1
+    );
+
     Serial.printf("[IR] Jammer started at %d Hz\n", frequency);
-    
-    // TODO: Implement continuous jamming signal
-    
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error IRModule::stopJammer() {
     if (!_jamming) {
         return Core::Error(Core::ErrorCode::SUCCESS);
+    }
+
+    _jamming = false;
+    
+    // Wait for task to finish
+    if (_jammerTaskHandle) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (_jammerTaskHandle) {
+            vTaskDelete(_jammerTaskHandle);
+            _jammerTaskHandle = nullptr;
+        }
     }
 
     _jamming = false;
@@ -601,6 +695,167 @@ Core::Error IRModule::setFrequency(uint32_t frequency) {
         return initialize();
     }
     return Core::Error(Core::ErrorCode::SUCCESS);
+}
+
+// Decoding helper functions
+bool IRModule::decodeNEC(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command) {
+    // NEC: 9ms header, 4.5ms pause, then 32 bits (address + command)
+    if (timings.size() < 70) return false;
+    
+    // Check for header (9000us high, 4500us low)
+    if (timings[0] < 8000 || timings[0] > 10000 || timings[1] < 4000 || timings[1] > 5000) {
+        return false;
+    }
+    
+    uint32_t data = 0;
+    size_t bitIndex = 0;
+    
+    // Decode 32 bits (16 address + 16 command)
+    for (size_t i = 2; i < timings.size() && bitIndex < 32; i += 2) {
+        if (i + 1 >= timings.size()) break;
+        
+        uint16_t mark = timings[i];
+        uint16_t space = timings[i + 1];
+        
+        if (mark > 500 && mark < 700) {  // 560us mark
+            if (space > 500 && space < 700) {  // 560us space = 0
+                // bit is 0
+            } else if (space > 1600 && space < 1800) {  // 1690us space = 1
+                data |= (1UL << bitIndex);
+            } else {
+                return false;  // Invalid timing
+            }
+            bitIndex++;
+        } else {
+            break;  // End of data
+        }
+    }
+    
+    if (bitIndex == 32) {
+        address = data & 0xFFFF;
+        command = (data >> 16) & 0xFFFF;
+        return true;
+    }
+    
+    return false;
+}
+
+bool IRModule::decodeRC5(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command) {
+    // RC5: Manchester encoding, 889us bit time
+    if (timings.size() < 20) return false;
+    
+    uint32_t data = 0;
+    size_t bitIndex = 0;
+    
+    // Skip first two bits (start bits)
+    size_t startIdx = 2;
+    
+    for (size_t i = startIdx; i < timings.size() && bitIndex < 14; i++) {
+        uint16_t timing = timings[i];
+        
+        if (timing > 400 && timing < 600) {  // ~500us = 0
+            // bit is 0
+        } else if (timing > 1200 && timing < 1400) {  // ~1300us = 1
+            data |= (1UL << bitIndex);
+        } else {
+            break;
+        }
+        bitIndex++;
+    }
+    
+    if (bitIndex >= 12) {
+        address = (data >> 6) & 0x1F;  // 5 bits
+        command = data & 0x3F;  // 6 bits
+        return true;
+    }
+    
+    return false;
+}
+
+bool IRModule::decodeRC6(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command) {
+    // RC6: Similar to RC5 but with different timing
+    if (timings.size() < 20) return false;
+    
+    // RC6 has a leader: 2666us mark, 889us space
+    if (timings[0] < 2400 || timings[0] > 2900 || timings[1] < 800 || timings[1] > 1000) {
+        return false;
+    }
+    
+    uint32_t data = 0;
+    size_t bitIndex = 0;
+    
+    // Decode from bit 2
+    for (size_t i = 2; i < timings.size() && bitIndex < 20; i++) {
+        uint16_t timing = timings[i];
+        
+        if (timing > 400 && timing < 600) {  // ~444us = 0
+            // bit is 0
+        } else if (timing > 1200 && timing < 1400) {  // ~1333us = 1
+            data |= (1UL << bitIndex);
+        } else {
+            break;
+        }
+        bitIndex++;
+    }
+    
+    if (bitIndex >= 16) {
+        address = (data >> 8) & 0xFF;
+        command = data & 0xFF;
+        return true;
+    }
+    
+    return false;
+}
+
+bool IRModule::decodeSIRC(const std::vector<uint16_t>& timings, uint32_t& address, uint32_t& command, uint8_t bits) {
+    // SIRC: 2400us header, then data
+    if (timings.size() < 10) return false;
+    
+    // Check for header (2400us mark, 600us space)
+    if (timings[0] < 2200 || timings[0] > 2600 || timings[1] < 500 || timings[1] > 700) {
+        return false;
+    }
+    
+    uint32_t data = 0;
+    size_t bitIndex = 0;
+    size_t expectedBits = (bits == 12) ? 12 : (bits == 15) ? 15 : 20;
+    
+    // Decode bits (LSB first)
+    for (size_t i = 2; i < timings.size() && bitIndex < expectedBits; i += 2) {
+        if (i + 1 >= timings.size()) break;
+        
+        uint16_t mark = timings[i];
+        uint16_t space = timings[i + 1];
+        
+        if (mark > 500 && mark < 700) {  // ~600us mark
+            if (space > 500 && space < 700) {  // ~600us space = 0
+                // bit is 0
+            } else if (space > 1100 && space < 1300) {  // ~1200us space = 1
+                data |= (1UL << bitIndex);
+            } else {
+                return false;
+            }
+            bitIndex++;
+        } else {
+            break;
+        }
+    }
+    
+    if (bitIndex == expectedBits) {
+        if (bits == 12) {
+            address = (data >> 7) & 0x1F;  // 5 bits
+            command = data & 0x7F;  // 7 bits
+        } else if (bits == 15) {
+            address = (data >> 7) & 0xFF;  // 8 bits
+            command = data & 0x7F;  // 7 bits
+        } else {  // 20 bits
+            address = (data >> 8) & 0xFF;  // 8 bits
+            command = data & 0xFF;  // 8 bits
+        }
+        return true;
+    }
+    
+    return false;
 }
 
 } // namespace Modules

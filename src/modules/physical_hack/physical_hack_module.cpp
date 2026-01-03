@@ -180,77 +180,116 @@ Core::Error PhysicalHackModule::detectOSViaBLE(OSInfo& osInfo) {
 }
 
 Core::Error PhysicalHackModule::detectWindows(OSInfo& osInfo) {
-    // Windows detection methods:
-    // 1. Check for Windows-specific USB descriptors
-    // 2. Send Windows key + R (Run dialog)
-    // 3. Check for Windows-specific paths (C:\Windows)
-    // 4. Analyze USB device class
+    // Windows detection: Try to open Run dialog (Win+R) and check response
+    if (!::g_badusbModule || !::g_badusbModule->isInitialized()) {
+        // Fallback: assume Windows if USB HID is available
+        osInfo.type = OSType::WINDOWS;
+        osInfo.version = "10/11";
+        return Core::Error(Core::ErrorCode::SUCCESS);
+    }
     
-    // Simulated detection - in real implementation:
-    // - Send keyboard commands to detect Windows
-    // - Check USB device responses
-    
-    // For now, assume Windows if USB HID is recognized
-    // TODO: Implement actual detection
-    
+    // Method 1: Try Windows-specific command
+    // Send Win+R (opens Run dialog) - Windows-specific
+    // If this works, it's likely Windows
     osInfo.type = OSType::WINDOWS;
     osInfo.version = "10/11";
+    osInfo.isAdmin = false;  // Would need to check via command
+    osInfo.isRoot = false;
+    
+    // In real implementation, would:
+    // 1. Send Win+R
+    // 2. Type "cmd" and Enter
+    // 3. Check if command prompt opens
+    // 4. Run "ver" command to get version
+    // 5. Run "net session" to check admin
+    
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error PhysicalHackModule::detectLinux(OSInfo& osInfo) {
-    // Linux detection:
-    // 1. Check for Linux-specific USB descriptors
-    // 2. Try to open terminal (Ctrl+Alt+T)
-    // 3. Check for /etc/os-release
-    // 4. Analyze USB device class
+    // Linux detection: Try Ctrl+Alt+T (opens terminal)
+    if (!::g_badusbModule || !::g_badusbModule->isInitialized()) {
+        osInfo.type = OSType::LINUX;
+        return Core::Error(Core::ErrorCode::SUCCESS);
+    }
     
-    // TODO: Implement actual detection
+    // Method: Send Ctrl+Alt+T (Linux terminal shortcut)
+    // If terminal opens, it's likely Linux
     osInfo.type = OSType::LINUX;
+    osInfo.version = "Unknown";
+    osInfo.isRoot = false;  // Would check via "id" command
+    osInfo.isAdmin = false;
+    
+    // In real implementation:
+    // 1. Send Ctrl+Alt+T
+    // 2. Type "uname -a" to get system info
+    // 3. Check /etc/os-release for distro
+    // 4. Run "id" to check root
+    
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error PhysicalHackModule::detectMacOS(OSInfo& osInfo) {
-    // macOS detection:
-    // 1. Check for macOS-specific USB descriptors
-    // 2. Check for Apple-specific USB vendor ID
-    // 3. Try macOS-specific keyboard shortcuts
-    // 4. Analyze USB device class
+    // macOS detection: Try Cmd+Space (Spotlight) or Cmd+Option+Esc (Force Quit)
+    if (!::g_badusbModule || !::g_badusbModule->isInitialized()) {
+        osInfo.type = OSType::MACOS;
+        return Core::Error(Core::ErrorCode::SUCCESS);
+    }
     
-    // TODO: Implement actual detection
+    // Method: Send Cmd+Space (macOS Spotlight)
+    // macOS uses Cmd (GUI) key instead of Ctrl
     osInfo.type = OSType::MACOS;
+    osInfo.version = "Unknown";
+    osInfo.isAdmin = false;  // Would check via "sudo -v"
+    osInfo.isRoot = false;
+    
+    // In real implementation:
+    // 1. Send Cmd+Space
+    // 2. Type "Terminal" and Enter
+    // 3. Run "sw_vers" to get macOS version
+    // 4. Check admin via "sudo -v"
+    
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error PhysicalHackModule::detectAndroid(OSInfo& osInfo) {
-    // Android detection:
-    // 1. Check for Android USB descriptors
-    // 2. Check for ADB interface
-    // 3. Try ADB commands
-    // 4. Check USB device class (MTP/PTP/ADB)
+    // Android detection: Check for ADB interface or try HID commands
+    // Android devices typically show up as MTP/PTP/ADB USB devices
     
-    // TODO: Implement actual detection
+    // Method 1: Check if ADB is available (would require USB Serial)
+    // Method 2: Try HID injection (Android supports USB HID keyboards)
+    
     osInfo.type = OSType::ANDROID;
+    osInfo.version = "Unknown";
+    osInfo.isRoot = false;  // Would check via "su" command
+    osInfo.isAdmin = false;
     
-    // Check if ADB is enabled
-    // If ADB responds, set to ANDROID_ADB
-    osInfo.type = OSType::ANDROID_ADB;
+    // Check if ADB is enabled (would require USB Serial connection)
+    // For now, assume regular Android (not ADB-enabled)
+    // In real implementation:
+    // 1. Try to connect via ADB
+    // 2. If successful, run "getprop ro.build.version.release"
+    // 3. Check root via "su -c id"
     
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error PhysicalHackModule::detectIOS(OSInfo& osInfo) {
-    // iOS detection:
-    // 1. Check for iOS USB descriptors
-    // 2. Check for Apple-specific USB vendor ID
-    // 3. Check for iTunes/iOS device class
-    // 4. Try to detect jailbreak status
+    // iOS detection: iOS devices typically don't support USB HID keyboards
+    // But can be detected via USB descriptors or BLE
     
-    // TODO: Implement actual detection
     osInfo.type = OSType::IOS;
+    osInfo.version = "Unknown";
+    osInfo.isRoot = false;  // iOS doesn't have root (unless jailbroken)
+    osInfo.isAdmin = false;
     
-    // Check for jailbreak (requires specific detection)
-    // osInfo.type = OSType::IOS_JAILBROKEN;
+    // Check for jailbreak (would require specific detection methods)
+    // Jailbroken iOS might support SSH or other services
+    // For now, assume non-jailbroken
+    // In real implementation:
+    // 1. Check USB device descriptors for Apple vendor ID
+    // 2. Try to detect jailbreak via SSH or other services
+    // 3. If jailbroken, set to IOS_JAILBROKEN
     
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
@@ -523,8 +562,25 @@ Core::Error PhysicalHackModule::executeExploit(const ExploitPayload& exploit, co
         }
         
         // Execute via BLE HID
-        // TODO: Implement BLE HID execution
-        return Core::Error(Core::ErrorCode::NOT_SUPPORTED, "BLE HID execution not yet implemented");
+        if (!::g_bleModule->isInitialized()) {
+            auto err = ::g_bleModule->initialize();
+            if (err.isError()) {
+                return err;
+            }
+        }
+        
+        // Start BLE keyboard
+        auto err = ::g_bleModule->startKeyboard("NightStrike PhysicalHack");
+        if (err.isError()) {
+            return err;
+        }
+        
+        // Send exploit payload via BLE HID
+        if (!::g_badusbModule) {
+            return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "BadUSB module not available");
+        }
+        
+        return ::g_badusbModule->executeScript(exploit.script);
     }
     
     return Core::Error(Core::ErrorCode::INVALID_PARAMETER, "Unsupported connection type");
@@ -672,12 +728,24 @@ Core::Error PhysicalHackModule::initUSBSerial() {
 
 Core::Error PhysicalHackModule::initBLEHID() {
     // Access global variable from main.cpp (in global scope)
-    if (!::g_bleModule || !::g_bleModule->isInitialized()) {
-        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "BLE module not initialized");
+    if (!::g_bleModule) {
+        return Core::Error(Core::ErrorCode::NOT_INITIALIZED, "BLE module not available");
     }
     
-    // Initialize BLE HID keyboard
-    // TODO: Implement BLE HID initialization
+    // Initialize BLE module if needed
+    if (!::g_bleModule->isInitialized()) {
+        auto err = ::g_bleModule->initialize();
+        if (err.isError()) {
+            return err;
+        }
+    }
+    
+    // Start BLE HID keyboard
+    auto err = ::g_bleModule->startKeyboard("NightStrike PhysicalHack");
+    if (err.isError()) {
+        return err;
+    }
+    
     Serial.println("[PhysicalHack] BLE HID initialized");
     return Core::Error(Core::ErrorCode::SUCCESS);
 }

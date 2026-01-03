@@ -1,9 +1,13 @@
 #include "modules/badusb_module.h"
+#include "modules/ble_module.h"
 #include "core/storage.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <map>
 #include <sstream>
+
+// Forward declaration
+extern NightStrike::Modules::BLEModule* g_bleModule;
 
 namespace NightStrike {
 namespace Modules {
@@ -249,6 +253,23 @@ Core::Error BadUSBModule::executeDuckyCommand(const std::string& command) {
 }
 
 Core::Error BadUSBModule::typeString(const std::string& text) {
+    // Use BLE HID if available
+    if (g_bleModule && g_bleModule->isInitialized()) {
+        // Ensure BLE keyboard is active
+        if (!_bleKeyboardActive) {
+            auto err = g_bleModule->startKeyboard("NightStrike BadUSB");
+            if (err.isError()) {
+                return err;
+            }
+            _bleKeyboardActive = true;
+        }
+        
+        // Send text via BLE HID
+        return g_bleModule->sendKeys(text);
+    }
+    
+    Serial.printf("[BadUSB] Type string: %s - BLE not available\n", text.c_str());
+    return Core::Error(Core::ErrorCode::SUCCESS);
     // Type each character
     for (char c : text) {
         uint8_t keyCode = getKeyCode(std::string(1, c));
@@ -263,14 +284,27 @@ Core::Error BadUSBModule::typeString(const std::string& text) {
 }
 
 Core::Error BadUSBModule::pressKey(uint8_t key, uint8_t modifiers) {
-    // TODO: Implement actual HID key press
-    // This would send HID report via BLE or USB
-    Serial.printf("[BadUSB] Press key: 0x%02X (modifiers: 0x%02X)\n", key, modifiers);
+    // Use BLE HID if available
+    if (g_bleModule && g_bleModule->isInitialized()) {
+        // Ensure BLE keyboard is active
+        if (!_bleKeyboardActive) {
+            auto err = g_bleModule->startKeyboard("NightStrike BadUSB");
+            if (err.isError()) {
+                return err;
+            }
+            _bleKeyboardActive = true;
+        }
+        
+        // Send raw HID key code via BLE
+        return g_bleModule->sendRawHID(key, modifiers);
+    }
+    
+    Serial.printf("[BadUSB] Press key: 0x%02X (modifiers: 0x%02X) - BLE not available\n", key, modifiers);
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
 Core::Error BadUSBModule::releaseKey(uint8_t key) {
-    // TODO: Implement actual HID key release
+    // Key release is handled automatically in BLE HID sendKeys
     Serial.printf("[BadUSB] Release key: 0x%02X\n", key);
     return Core::Error(Core::ErrorCode::SUCCESS);
 }

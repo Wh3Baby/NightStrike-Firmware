@@ -7,6 +7,8 @@
 #include <ArduinoJson.h>
 #include <map>
 #include <memory>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 // Условная компиляция RF драйверов для экономии памяти
 #ifdef ENABLE_RF_CC1101
@@ -18,6 +20,31 @@
 
 namespace NightStrike {
 namespace Modules {
+
+// RF Jammer task function
+void rfJammerTask(void* param) {
+    RFModule* module = static_cast<RFModule*>(param);
+    IRFDriver* driver = static_cast<IRFDriver*>(module->_rfDriver);
+    
+    // Generate random noise data for jamming
+    uint8_t noise[32];
+    for (int i = 0; i < 32; ++i) {
+        noise[i] = random(0, 256);
+    }
+    
+    while (module->_jamming) {
+        // Transmit noise continuously
+        driver->transmit(noise, sizeof(noise));
+        
+        if (module->_intermittent) {
+            vTaskDelay(random(10, 100) / portTICK_PERIOD_MS);  // Random delay for intermittent jamming
+        } else {
+            vTaskDelay(1 / portTICK_PERIOD_MS);  // Continuous jamming
+        }
+    }
+    
+    vTaskDelete(NULL);
+}
 
 RFModule::RFModule() {
     _rfDriver = nullptr;
@@ -191,10 +218,26 @@ Core::Error RFModule::startJammer(bool intermittent) {
         return Core::Error(Core::ErrorCode::ALREADY_INITIALIZED);
     }
 
+    if (!_rfDriver) {
+        return Core::Error(Core::ErrorCode::NOT_SUPPORTED, "No RF hardware");
+    }
+
     _jamming = true;
+    _intermittent = intermittent;
+    
+    // Start jamming task
+    xTaskCreatePinnedToCore(
+        rfJammerTask,
+        "RFJammer",
+        4096,
+        this,
+        1,
+        &_jammerTaskHandle,
+        1
+    );
+    
     Serial.printf("[RF] Jammer started (intermittent: %s)\n",
                   intermittent ? "yes" : "no");
-    // TODO: Implement actual jamming
     return Core::Error(Core::ErrorCode::SUCCESS);
 }
 
@@ -204,6 +247,16 @@ Core::Error RFModule::stopJammer() {
     }
 
     _jamming = false;
+    
+    // Wait for task to finish
+    if (_jammerTaskHandle) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (_jammerTaskHandle) {
+            vTaskDelete(_jammerTaskHandle);
+            _jammerTaskHandle = nullptr;
+        }
+    }
+    
     Serial.println("[RF] Jammer stopped");
     return Core::Error(Core::ErrorCode::SUCCESS);
 }

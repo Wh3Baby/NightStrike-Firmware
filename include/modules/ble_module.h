@@ -51,11 +51,19 @@ public:
     // Keyboard injection
     Core::Error startKeyboard(const std::string& deviceName);
     Core::Error sendKeys(const std::string& text);
+    Core::Error sendRawHID(uint8_t key, uint8_t modifiers = 0);
     Core::Error stopKeyboard();
 
 private:
+    bool _initialized = false;
     bool _scanning = false;
     bool _keyboardActive = false;
+    void* _hidServer = nullptr;  // NimBLEServer* for HID
+    void* _hidService = nullptr;  // NimBLEService* for HID
+    void* _inputChar = nullptr;   // NimBLECharacteristic* for HID input
+    void* _outputChar = nullptr;  // NimBLECharacteristic* for HID output
+    void* _controlChar = nullptr; // NimBLECharacteristic* for HID control
+    void* _reportMapChar = nullptr; // NimBLECharacteristic* for HID report map
 };
 
 } // namespace Modules
